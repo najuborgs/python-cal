@@ -1,0 +1,6 @@
+{
+  "name": "PyCalc - Calculadora Científica em Python WebAssembly",
+  "description": "Calculadora visual moderna e científica com toda a lógica matemática executada em Python real via Pyodide e WebAssembly no navegador.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
