@@ -91,16 +91,19 @@ def raiz_quadrada(numero):
     return math.sqrt(num)
 
 
-def porcentagem(valor, base=100.0):
+def porcentagem(valor, base=None):
     """
-    Calcula a porcentagem. Se base for fornecida, calcula (valor * base) / 100.
-    Caso contrário, divide o valor por 100.
+    Calcula a porcentagem.
+    - Se a base for fornecida (ex: 20% de 150 -> valor=20, base=150):
+      Calcula a parte proporcional: (valor * base) / 100.0 = 30.0
+    - Se a base for omitida ou None (ex: 20%):
+      Converte o percentual para sua fração decimal: 20.0 / 100.0 = 0.2
     """
     v = float(valor)
-    b = float(base)
-    if b == 100.0:
+    if base is None or float(base) == 100.0:
         return v / 100.0
-    return (b * v) / 100.0
+    b = float(base)
+    return (v * b) / 100.0
 
 
 def fatorial(n):
@@ -208,8 +211,8 @@ def executar_operacao(tipo_operacao, a, b=None):
         elif tipo_operacao in ('raiz', 'sqrt', '√'):
             res = raiz_quadrada(a)
             simbolo = "√"
-        elif tipo_operacao in ('porcento', '%'):
-            res = porcentagem(a, b if b is not None else 100.0)
+        elif tipo_operacao in ('porcento', '%', 'porcentagem'):
+            res = porcentagem(a, b)
             simbolo = "%"
         elif tipo_operacao == 'fatorial':
             res = fatorial(a)
@@ -318,7 +321,28 @@ def calcular_expressao(expressao_str, em_graus=True):
             "tipo_erro": "SecurityError"
         }
 
-    # Tratamento para porcentagem rápida (ex: 50% -> (50/100))
+    # Normalização inteligente de porcentagens
+    # 1. Trata 'de' ou 'of' como multiplicação (ex: 20% de 150 -> 20% * 150)
+    expr = re.sub(r'(\d+(?:\.\d+)?%)\s*(?:de|of)\s*(\d+(?:\.\d+)?)', r'\1 * \2', expr, flags=re.IGNORECASE)
+
+    # 2. Trata multiplicação implícita após % (ex: 20% 150 -> 20% * 150)
+    expr = re.sub(r'(\d+(?:\.\d+)?%)\s*([0-9(])', r'\1 * \2', expr)
+
+    # 3. Trata adição e subtração percentual sobre uma base (ex: 150 + 20% -> 150 + (150 * (20/100.0)) = 180)
+    expr = re.sub(
+        r'(\b\d+(?:\.\d+)?)\s*([+\-])\s*(\d+(?:\.\d+)?)%',
+        r'(\1 \2 (\1 * (\3 / 100.0)))',
+        expr
+    )
+
+    # 4. Trata 'A % B' como porcentagem direta (ex: 20 % 150 -> (20 * 150 / 100.0) = 30)
+    expr = re.sub(
+        r'(\b\d+(?:\.\d+)?)\s*%\s*(\d+(?:\.\d+)?\b)',
+        r'((\1 * \2) / 100.0)',
+        expr
+    )
+
+    # 5. Tratamento para porcentagem direta/multiplicação (ex: 150 * 20% -> 150 * (20/100.0) = 30)
     expr = re.sub(r'(\d+(\.\d+)?)%', r'(\1/100.0)', expr)
 
     # Se estiver em modo graus, ajusta chamadas de sin, cos, tan
@@ -539,6 +563,25 @@ def executar_testes_unitarios():
     except Exception as e:
         registrar_teste("Trigonometria (Graus)", "Trig", "sen(90°), cos(0°)", "1.0 e 1.0", str(e), False)
 
+    # Teste 11: Cálculo de Porcentagem Direta
+    try:
+        p1 = porcentagem(20, 150)
+        p2 = porcentagem(20)
+        passou = (p1 == 30.0 and math.isclose(p2, 0.2, rel_tol=1e-9))
+        registrar_teste("Porcentagem Direta", "Cálculo de 20% de 150 e 20% decimal", "porcentagem(20, 150)", 30.0, p1, passou, "20% de 150 = 30")
+    except Exception as e:
+        registrar_teste("Porcentagem Direta", "Cálculo de 20% de 150", "20, 150", 30.0, str(e), False)
+
+    # Teste 12: Expressão com Porcentagem
+    try:
+        res_mult = calcular_expressao("150 * 20%")
+        res_soma = calcular_expressao("150 + 20%")
+        passou = (res_mult["sucesso"] and res_mult["valor_bruto"] == 30.0 and
+                  res_soma["sucesso"] and res_soma["valor_bruto"] == 180.0)
+        registrar_teste("Expressão com Porcentagem", "Avaliação de 150 × 20% e acréscimo 150 + 20%", "150 * 20% e 150 + 20%", "30 e 180", f"{res_mult.get('resultado')} e {res_soma.get('resultado')}", passou, "Acréscimo e proporção")
+    except Exception as e:
+        registrar_teste("Expressão com Porcentagem", "150 * 20%", "150 * 20%", "30", str(e), False)
+
     total_passou = sum(1 for t in testes if t["passou"])
     return {
         "total": len(testes),
@@ -598,7 +641,6 @@ def processar_requisicao_json(payload_str):
                 "math": math
             }
             try:
-                # Tenta como expressão
                 resultado_eval = eval(codigo, {"__builtins__": __builtins__}, local_vars)
                 return json.dumps({
                     "sucesso": True,
@@ -606,7 +648,6 @@ def processar_requisicao_json(payload_str):
                     "tipo": type(resultado_eval).__name__
                 })
             except SyntaxError:
-                # Se não for expressão, executa como bloco de código
                 import io
                 import sys
                 buffer = io.StringIO()

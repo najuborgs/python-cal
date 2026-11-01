@@ -65,6 +65,9 @@ export const Calculator: React.FC = () => {
         inserirCaractere(e.key);
       } else if (e.key === '.') {
         inserirDecimal();
+      } else if (e.key === '%') {
+        e.preventDefault();
+        inserirPorcentagem();
       } else if (e.key === '+') {
         inserirOperador('+');
       } else if (e.key === '-') {
@@ -133,6 +136,38 @@ export const Calculator: React.FC = () => {
       setExpressao((prev) => (prev === '' ? '0.' : prev + valor));
       setDisplayValue((prev) => (prev === '0' ? '0.' : prev + valor));
     }
+  };
+
+  // Inserção de porcentagem (%)
+  const inserirPorcentagem = () => {
+    setErroMensagem(null);
+
+    // Se já havia um resultado anterior, aplica porcentagem sobre ele (ex: 50 -> 50%)
+    if (ultimoResultado !== null) {
+      setExpressao(ultimoResultado + '%');
+      setDisplayValue(ultimoResultado + '%');
+      setUltimoResultado(null);
+      return;
+    }
+
+    if (!expressao || expressao === '0') {
+      return;
+    }
+
+    const trimmed = expressao.trim();
+    const ultimoChar = trimmed.slice(-1);
+
+    // Evita duplicar % ou colocar imediatamente após operadores
+    if (['+', '-', '×', '÷', '^', '*', '/', '('].includes(ultimoChar)) {
+      return;
+    }
+
+    if (ultimoChar === '%') {
+      return;
+    }
+
+    setExpressao(expressao + '%');
+    setDisplayValue((prev) => (prev.endsWith('%') ? prev : prev + '%'));
   };
 
   // Inserção de operadores aritméticos +, -, ×, ÷, ^
@@ -529,9 +564,9 @@ export const Calculator: React.FC = () => {
                     )
                   </button>
                   <button
-                    onClick={() => inserirCaractere('%')}
-                    className="p-2 sm:p-2.5 rounded-xl bg-slate-950/70 hover:bg-blue-900/30 text-blue-300 hover:text-blue-200 border border-slate-800/80 font-mono text-xs transition-all active:scale-95 hidden sm:block"
-                    title="Porcentagem"
+                    onClick={inserirPorcentagem}
+                    className="p-2 sm:p-2.5 rounded-xl bg-slate-950/70 hover:bg-blue-900/30 text-blue-300 hover:text-blue-200 border border-slate-800/80 font-mono text-xs transition-all active:scale-95"
+                    title="Cálculo de Porcentagem (%)"
                   >
                     %
                   </button>
@@ -656,7 +691,7 @@ export const Calculator: React.FC = () => {
                   +
                 </button>
 
-                {/* Linha 5: 0 (span 2), Ponto decimal (.), Calcular (=) */}
+                {/* Linha 5: 0, Ponto decimal (.), Porcentagem (%), Calcular (=) */}
                 <button
                   onClick={() => inserirCaractere('0')}
                   className="h-14 sm:h-16 rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 text-white border border-slate-700/70 font-semibold text-2xl font-mono transition-all active:scale-95 shadow-sm"
@@ -673,20 +708,25 @@ export const Calculator: React.FC = () => {
                 </button>
 
                 <button
+                  onClick={inserirPorcentagem}
+                  className="h-14 sm:h-16 rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 text-white border border-slate-700/70 font-semibold text-2xl font-mono transition-all active:scale-95 shadow-sm"
+                  title="Cálculo de Porcentagem (%)"
+                >
+                  %
+                </button>
+
+                <button
                   onClick={calcular}
                   disabled={isCalculando}
-                  className="col-span-2 h-14 sm:h-16 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold text-2xl transition-all active:scale-98 flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 border border-blue-400/40 disabled:opacity-50"
+                  className="h-14 sm:h-16 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold text-2xl transition-all active:scale-98 flex items-center justify-center gap-1.5 shadow-lg shadow-blue-600/30 border border-blue-400/40 disabled:opacity-50"
                   title="Calcular resultado em Python (Enter ou =)"
                 >
                   {isCalculando ? (
-                    <span className="text-base font-normal flex items-center gap-2">
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                      Processando em Python...
-                    </span>
+                    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
                   ) : (
                     <>
                       <Equal className="w-6 h-6" />
-                      <span>Calcular</span>
+                      <span className="hidden sm:inline text-base font-semibold">Calcular</span>
                     </>
                   )}
                 </button>
